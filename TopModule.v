@@ -108,6 +108,7 @@ module TopModule(
     // don't overwrite.
     // both ports are clocked at 100 purposely.
     wire writeEn = ((camX <= 640) && (camY <= 480)&& (~cameraOff));
+    wire [11:0] pSq [8:0];
     FrameBuffer frameBuf (  .writeClk(clk100), 
                             .inX(camX),
                             .inY(camY),
@@ -117,32 +118,43 @@ module TopModule(
                             .readClk(clk100),
                             .outX(vgaX),
                             .outY(vgaY),
-                            .outR(memR),
-                            .outG(memG),
-                            .outB(memB)
+                            .outPixel_lu(pSq[0]),
+                            .outPixel_lm(pSq[1]),
+                            .outPixel_ld(pSq[2]),
+                            .outPixel_mu(pSq[3]),
+                            .outPixel_mm(pSq[4]),
+                            .outPixel_md(pSq[5]),
+                            .outPixel_ru(pSq[6]),
+                            .outPixel_rm(pSq[7]),
+                            .outPixel_rd(pSq[8])                            
     );
     
-    wire [3:0] edgeR;
-    wire [3:0] edgeG;
-    wire [3:0] edgeB;
-    Sobel_Edge_Detection edgeDetect (   .xAddr(vgaX),
-                                        .pixelR(memR),
-                                        .pixelG(memG),
-                                        .pixelB(memB),
-                                        .clk25(clk25),
-                                        
-                                        .cutThresh(SW[3:0]),
-                                        .rThresh(SW[15:12]),
-                                        .gThresh(SW[11:8]),
-                                        .bThresh(SW[7:4]),
-                                        .shiftBrightness(edgeBrightnessShift),
-                                        
-                                        .outR(edgeR),
-                                        .outG(edgeG),
-                                        .outB(edgeB));
-    wire [3:0] vgaR = (edgeDetectEnable) ? edgeR : memR;
-    wire [3:0] vgaG = (edgeDetectEnable) ? edgeG : memG;
-    wire [3:0] vgaB = (edgeDetectEnable) ? edgeB : memB;
+    wire [3:0] vgaR;
+    wire [3:0] vgaG;
+    wire [3:0] vgaB;
+    ResolvePixel pixResolve (   .xAddr(vgaX),
+                                .inPixel_lu(pSq[0]),
+                                .inPixel_lu(pSq[1]),
+                                .inPixel_lu(pSq[2]),
+                                .inPixel_lu(pSq[3]),
+                                .inPixel_lu(pSq[4]),
+                                .inPixel_lu(pSq[5]),
+                                .inPixel_lu(pSq[6]),
+                                .inPixel_lu(pSq[7]),
+                                .inPixel_lu(pSq[8]),
+                                .clk25(clk25),
+                                .clk100(clk100),
+                                // sobel.
+                                .cutThresh(SW[3:0]),
+                                .rThresh(SW[15:12]),
+                                .gThresh(SW[11:8]),
+                                .bThresh(SW[7:4]),
+                                .shiftBrightness(edgeBrightnessShift),
+                                
+                                .outR(vgaR),
+                                .outG(vgaG),
+                                .outB(vgaB));
+                                
     VGA vga (   .pixel_clk(clk25),
                 .vgaInR(vgaR),
                 .vgaInG(vgaG),
