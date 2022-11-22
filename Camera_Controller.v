@@ -34,7 +34,8 @@ module Camera_Controller(
     output              OV7670_XCLK,
     
     // output to RAM
-    output      [18:0]  pixelAddr,
+    output      [9:0]   outX,
+    output      [8:0]   outY,
     output      [15:0]  pixelValue,
     output              pixelValid
     );
@@ -68,7 +69,8 @@ module Camera_Controller(
                                     .p_data(OV7670_D),
                                     .pixel_data(pixelValue),
                                     .out_valid(pixelValid),
-                                    .pixel_addr(pixelAddr),
+                                    .pixelX(outX),
+                                    .pixelY(outY),
                                     .frame_done(frameDone)
     );
 

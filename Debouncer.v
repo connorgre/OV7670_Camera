@@ -21,23 +21,23 @@
 
 // debounces after .25s if 25Mhz clock given
 module Debouncer(
-    input btnc,
-    input clk25,
+    input btnIn,
+    input clk,
     
-    output reg btncDown = 0
+    output reg btnDown = 0
     );
     
-    reg [23:0] btncCounter = 24'h00_0000;
+    reg [19:0] btnCounter = 20'h0_0000;
     
-    always@(posedge clk25) begin
-        if (btnc) begin
-            btncCounter <= 24'hFF_FFFF;
-            btncDown = 1;
+    always@(posedge clk) begin
+        if (btnIn) begin
+            btnCounter <= 20'hF_FFFF;
+            btnDown = 1;
         end else begin
-            if (btncCounter > 24'h00_0000)
-                btncCounter <= btncCounter - 1;
+            if (btnCounter > 20'h0_0000)
+                btnCounter <= btnCounter - 1;
             else
-                btncDown = 0;
+                btnDown = 0;
         end
     end
     

@@ -24,7 +24,8 @@ module camera_read(
 	input wire href,
 	input wire [7:0] p_data,
 	output reg [15:0] pixel_data = 16'hFEC8,   // random start val bc why not.
-	output     [18:0] pixel_addr,
+	output     [9:0]  pixelX,
+	output     [8:0]  pixelY,
 	output            out_valid,
 	output reg frame_done = 0
     );
@@ -39,6 +40,9 @@ module camera_read(
 	localparam ROW_CAPTURE = 1;
 	reg [9:0] hIdx = 10'h000;
 	reg [8:0] vIdx = 9'h000;
+	
+	assign pixelX = hIdx;
+	assign pixelY = vIdx;
     reg [7:0] firstHalfPixel = 8'h00;
 	always@(posedge p_clock) begin 
         prevHref <= href;
@@ -78,5 +82,4 @@ module camera_read(
     end
 
     assign out_valid = (vIdx <= 480 && hIdx <= 640) ? pixel_valid           : 1'b0;
-    assign pixel_addr = (vIdx <= 480 && hIdx <= 640) ? vIdx * 640 + hIdx    : 19'h0_0000;
 endmodule

@@ -22,12 +22,15 @@
 // Sets up 3 block RAMs, one for each pixel color.
 module FrameBuffer(
     input           writeClk,
-    input   [18:0]  inAddr,
+    input   [9:0]   inX,
+    input   [8:0]   inY,
     input           writeEn,
     input   [15:0]  pixelIn,
     
     input           readClk,
-    input   [18:0]  outAddr,
+
+    input   [9:0]   outX,
+    input   [8:0]   outY,
     output  [3:0]   outR,
     output  [3:0]   outG,
     output  [3:0]   outB
@@ -39,9 +42,18 @@ module FrameBuffer(
     // The data getting written to RAM is   RRRRx_GGGGxx_BBBBx
     //                                      15-12 10-7   4-1
     // 3 4x307,200 block memories.
+    
+    wire [18:0] inAddr = (inY <= 480 && inX <= 640) ? (inY * 640 + inX) : 19'h0_0000;
+    wire [18:0] outAddr = (outY <= 480 && outX <= 640) ? (outY * 640 + outX) : 19'h0_0000;
+    
+    
+    wire [3:0] redIn   = {pixelIn[15:12]};//, 1'b0};
+    wire [3:0] greenIn = {pixelIn[10:7]};//,  1'b0};
+    wire [3:0] blueIn  = {pixelIn[4:1]};//,   1'b0};
+    
     blk_mem_gen_0 ramRed (  .addra(inAddr),
                             .clka(writeClk),
-                            .dina(pixelIn[15:12]),
+                            .dina(redIn),
                             .ena(1'b1),
                             .wea(writeEn),
                             .addrb(outAddr),
@@ -51,7 +63,7 @@ module FrameBuffer(
     );
     blk_mem_gen_0 ramBlue ( .addra(inAddr),
                             .clka(writeClk),
-                            .dina(pixelIn[4:1]),
+                            .dina(blueIn),
                             .ena(1'b1),
                             .wea(writeEn),
                             .addrb(outAddr),
@@ -61,7 +73,7 @@ module FrameBuffer(
     );
     blk_mem_gen_0 ramGreen (.addra(inAddr),
                             .clka(writeClk),
-                            .dina(pixelIn[10:7]),
+                            .dina(greenIn),
                             .ena(1'b1),
                             .wea(writeEn),
                             .addrb(outAddr),

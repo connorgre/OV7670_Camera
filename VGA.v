@@ -23,10 +23,11 @@
 module VGA(
     input   wire pixel_clk,   //25MHZ clk
     // From memory
-    input       [3:0] mem_R,
-    input       [3:0] mem_G,
-    input       [3:0] mem_B,
-    output      [18:0] pixelAddr,
+    input       [3:0] vgaInR,
+    input       [3:0] vgaInG,
+    input       [3:0] vgaInB,
+    output      [9:0] outX,
+    output      [8:0] outY,
     
     // To VGA
     output  reg [3:0] VGA_R,
@@ -40,7 +41,8 @@ wire [10:0] vga_hcnt, vga_vcnt;
 wire vga_blank;
 
 wire inBounds = ((vga_vcnt <= 480) && (vga_hcnt <= 640));
-assign pixelAddr = vga_vcnt * 640 + vga_hcnt;
+assign outX = vga_hcnt;
+assign outY = vga_vcnt;
 
 // Instantiate VGA controller
 vga_controller_640_60 vga_controller(
@@ -64,17 +66,9 @@ always @(*) begin
         VGA_B = 0;
     end
     else begin  // Image to be displayed
-        VGA_R = mem_R;
-        VGA_G = mem_G;
-        VGA_B = mem_B;
-        
-        // White square at the center -- idk i guess leave this in just to
-        if ((vga_hcnt >= 300 && vga_hcnt <= 340) &&
-        	(vga_vcnt >= 220 && vga_vcnt <= 260)) begin
-			VGA_R = 4'hf;
-			VGA_G = 4'hf;
-			VGA_B = 4'hf;
-        end
+        VGA_R = vgaInR;
+        VGA_G = vgaInG;
+        VGA_B = vgaInB;
     end
 end
 

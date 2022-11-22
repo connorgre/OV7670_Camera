@@ -49,7 +49,11 @@ module TopModule(
     output              DP,
     
     // Buttons
-    input               btnc
+    input               BTNC,
+    input               BTNL,
+    input               BTNU,
+    // switches
+    input [15:0]        SW
     );
     reg clk50 = 0;
     reg clk25 = 0;
@@ -60,9 +64,18 @@ module TopModule(
         clk25 <= ~clk25;
     end
     wire btncPressed;
-    Debouncer btncDeb (btnc, clk25, btncPressed);
+    wire btnlPressed;
+    wire btnuPressed;
     
-    wire [18:0] pixelAddr;
+    wire cameraOff = btncPressed;
+    wire edgeDetectEnable = btnlPressed;
+    wire edgeBrightnessShift = btnuPressed;
+    
+    ButtonToggle btncTog (BTNC, clk25, btncPressed);
+    ButtonToggle btnlTog (BTNL, clk25, btnlPressed);
+    Debouncer    btnuDeb (BTNU, clk25, btnuPressed);
+    wire [9:0]  camX;
+    wire [8:0]  camY;
     wire [15:0] pixelValue;
     wire        pixelValid;
     
@@ -78,7 +91,8 @@ module TopModule(
                                 .OV7670_PWDN(OV7670_PWDN),
                                 .OV7670_RESET(OV7670_RESET),
                                 .OV7670_XCLK(OV7670_XCLK),
-                                .pixelAddr(pixelAddr),
+                                .outX(camX),
+                                .outY(camY),
                                 .pixelValue(pixelValue),
                                 .pixelValid(pixelValid)
     );
@@ -86,30 +100,55 @@ module TopModule(
     wire [3:0] memR;
     wire [3:0] memG;
     wire [3:0] memB;
-    wire [18:0] vgaAddr;
+    wire [9:0] vgaX;
+    wire [8:0] vgaY;
     // the read latency is up to 2 clock cycles... I'm fixing this by using clk100 as the
     // read clock, but it's possible I need delay the write by two cycles.
     
     // don't overwrite.
-    // both buffers are clocked at 100 purposely.
-    wire writeEn = ((pixelAddr < 19'd307200) && (~btncPressed));
+    // both ports are clocked at 100 purposely.
+    wire writeEn = ((camX <= 640) && (camY <= 480)&& (~cameraOff));
     FrameBuffer frameBuf (  .writeClk(clk100), 
-                            .inAddr(pixelAddr),
+                            .inX(camX),
+                            .inY(camY),
                             .writeEn(pixelValid & writeEn),
                             .pixelIn(pixelValue),
                             
                             .readClk(clk100),
-                            .outAddr(vgaAddr),
+                            .outX(vgaX),
+                            .outY(vgaY),
                             .outR(memR),
                             .outG(memG),
                             .outB(memB)
     );
     
+    wire [3:0] edgeR;
+    wire [3:0] edgeG;
+    wire [3:0] edgeB;
+    Sobel_Edge_Detection edgeDetect (   .xAddr(vgaX),
+                                        .pixelR(memR),
+                                        .pixelG(memG),
+                                        .pixelB(memB),
+                                        .clk25(clk25),
+                                        
+                                        .cutThresh(SW[3:0]),
+                                        .rThresh(SW[15:12]),
+                                        .gThresh(SW[11:8]),
+                                        .bThresh(SW[7:4]),
+                                        .shiftBrightness(edgeBrightnessShift),
+                                        
+                                        .outR(edgeR),
+                                        .outG(edgeG),
+                                        .outB(edgeB));
+    wire [3:0] vgaR = (edgeDetectEnable) ? edgeR : memR;
+    wire [3:0] vgaG = (edgeDetectEnable) ? edgeG : memG;
+    wire [3:0] vgaB = (edgeDetectEnable) ? edgeB : memB;
     VGA vga (   .pixel_clk(clk25),
-                .mem_R(memR),
-                .mem_G(memG),
-                .mem_B(memB),
-                .pixelAddr(vgaAddr),
+                .vgaInR(vgaR),
+                .vgaInG(vgaG),
+                .vgaInB(vgaB),
+                .outX(vgaX),
+                .outY(vgaY),
                 .VGA_R(vga_red),
                 .VGA_B(vga_blue),
                 .VGA_G(vga_green),
@@ -125,10 +164,10 @@ module TopModule(
     reg atZero = 0;
     assign LED = frameCnt;
     always@(posedge clk100) begin
-        if (pixelAddr == 19'h0_0000 && atZero == 0) begin
+        if ((camX + camY) == 0 && atZero == 0) begin
             frameCnt <= frameCnt + 1;
             atZero <= 1;
-        end else if (pixelAddr != 19'h0_0000) begin
+        end else if ((camX + camY) != 0) begin
             atZero <= 0;
         end
     end
