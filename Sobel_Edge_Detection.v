@@ -27,23 +27,16 @@ module Sobel_Edge_Detection(
     // threshold values to display RGB colors at.  Will show a pixel if
     // value is above colorThresh and below cutThresh
     input [3:0] cutThresh,
-    input [3:0] rThresh,
-    input [3:0] gThresh,
-    input [3:0] bThresh,
-    input       shiftBrightness,
+    input [3:0] absThresh,
+    input [3:0] totThresh,
     
-    output [11:0] outPixel
+    output [2:0] outEdge
     );
     
     wire [3:0] pixelR = pixelIn[11:8];
     wire [3:0] pixelG = pixelIn[7:4];
     wire [3:0] pixelB = pixelIn[3:0];
     
-    localparam weakThresh   = 1;
-    localparam midThresh    = 4;
-    localparam strongThresh = 7;
-    localparam vsThresh     = 10;
-    localparam topThresh    = 14;
     reg [11:0] prevLine [639:0];
     reg [11:0] prevXPixel;
     reg [11:0] currPixelReg;
@@ -70,24 +63,15 @@ module Sobel_Edge_Detection(
     wire [3:0] maxDiffB = (maxDiffA[11:8] > maxDiffA[7:4]) ? maxDiffA[11:8] : maxDiffA[7:4];
     wire [3:0] maxDiff  = (maxDiffA[3:0]  > maxDiffB)      ? maxDiffA[3:0]  : maxDiffB;
     
-    wire passCutoff =  maxDiff <= cutThresh;
-    wire redEdge    = (maxDiff >= rThresh) && passCutoff;
-    wire greenEdge  = (maxDiff >= gThresh) && passCutoff;
-    wire blueEdge   = (maxDiff >= bThresh) && passCutoff;
-
-    wire [3:0] dimmedR;
-    wire [3:0] dimmedG;
-    wire [3:0] dimmedB;
+    wire [5:0] totDiff = maxDiffA[11:8] + maxDiffA[7:4] + maxDiffA[3:0];
     
-    Pixel_Brightness_Shifter brightShift (  .pixelR(pixelR),
-                                            .pixelG(pixelG),
-                                            .pixelB(pixelB),
-                                            .shiftSig(shiftBrightness),
-                                            .rOut(dimmedR),
-                                            .gOut(dimmedG),
-                                            .bOut(dimmedB));
+    wire passCutoff =  maxDiff <= cutThresh;
+    // red   = max(diff(R), diff(G) ,diff(B)) >= absThresh (SW[11:8])
+    // green = max(diff(R), diff(G) ,diff(B)) == cutThresh (SW[15:12])
+    // blue  = diff(R) + diff(G) + diff(B)    >= totThresh (SW[7:4])
+    wire redEdge    = (maxDiff >= absThresh) && passCutoff;
+    wire greenEdge  = (maxDiff == cutThresh);
+    wire blueEdge   = (totDiff >= totThresh) && passCutoff;
 
-    assign outPixel[11:8] = (redEdge)   ? 4'hF : dimmedR;
-    assign outPixel[7:4]  = (greenEdge) ? 4'hF : dimmedG;
-    assign outPixel[3:0]  = (blueEdge)  ? 4'hF : dimmedB;
+    assign outEdge = {redEdge, greenEdge, blueEdge};
 endmodule

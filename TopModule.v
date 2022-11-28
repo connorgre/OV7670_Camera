@@ -52,6 +52,7 @@ module TopModule(
     input               BTNC,
     input               BTNL,
     input               BTNU,
+    input               BTNR,
     // switches
     input [15:0]        SW
     );
@@ -66,13 +67,15 @@ module TopModule(
     wire btncPressed;
     wire btnlPressed;
     wire btnuPressed;
+    wire btnrPressed;
     
     wire cameraOff = btncPressed;
     wire edgeDetectEnable = btnlPressed;
     wire edgeBrightnessShift = btnuPressed;
-    
+    wire blurImage = btnrPressed;
     ButtonToggle btncTog (BTNC, clk25, btncPressed);
     ButtonToggle btnlTog (BTNL, clk25, btnlPressed);
+    Debouncer    btnrDeb (BTNR, clk25, btnrPressed);
     Debouncer    btnuDeb (BTNU, clk25, btnuPressed);
     wire [9:0]  camX;
     wire [8:0]  camY;
@@ -114,7 +117,7 @@ module TopModule(
                             .inY(camY),
                             .writeEn(pixelValid & writeEn),
                             .pixelIn(pixelValue),
-                            
+                            .blurPixel(blurImage),
                             .readClk(clk100),
                             .outX(vgaX),
                             .outY(vgaY),
@@ -134,22 +137,23 @@ module TopModule(
     wire [3:0] vgaB;
     ResolvePixel pixResolve (   .xAddr(vgaX),
                                 .inPixel_lu(pSq[0]),
-                                .inPixel_lu(pSq[1]),
-                                .inPixel_lu(pSq[2]),
-                                .inPixel_lu(pSq[3]),
-                                .inPixel_lu(pSq[4]),
-                                .inPixel_lu(pSq[5]),
-                                .inPixel_lu(pSq[6]),
-                                .inPixel_lu(pSq[7]),
-                                .inPixel_lu(pSq[8]),
+                                .inPixel_lm(pSq[1]),
+                                .inPixel_ld(pSq[2]),
+                                .inPixel_mu(pSq[3]),
+                                .inPixel_mm(pSq[4]),
+                                .inPixel_md(pSq[5]),
+                                .inPixel_ru(pSq[6]),
+                                .inPixel_rm(pSq[7]),
+                                .inPixel_rd(pSq[8]),
                                 .clk25(clk25),
                                 .clk100(clk100),
                                 // sobel.
-                                .cutThresh(SW[3:0]),
-                                .rThresh(SW[15:12]),
-                                .gThresh(SW[11:8]),
-                                .bThresh(SW[7:4]),
+                                .cutThresh(SW[15:12]),
+                                .absThresh(SW[11:8]),
+                                .totThresh(SW[7:4]),
+                                .numEdgesNeeded(SW[3:0]),
                                 .shiftBrightness(edgeBrightnessShift),
+                                .edgeDetectEnable(edgeDetectEnable),
                                 
                                 .outR(vgaR),
                                 .outG(vgaG),
@@ -167,21 +171,9 @@ module TopModule(
                 .VGA_HS(vga_hsync),
                 .VGA_VS(vga_vsync)
     );
-    reg [31:0] numPixels = 32'h0000_0000;
-    always@(posedge pixelValid)
-        numPixels <= numPixels + 1;
-    seg7decimal(numPixels, clk100, SEG, AN, DP);
     
-    reg [15:0] frameCnt = 16'h0000;
-    reg atZero = 0;
-    assign LED = frameCnt;
-    always@(posedge clk100) begin
-        if ((camX + camY) == 0 && atZero == 0) begin
-            frameCnt <= frameCnt + 1;
-            atZero <= 1;
-        end else if ((camX + camY) != 0) begin
-            atZero <= 0;
-        end
-    end
+    wire [15:0] const0 = 16'h0000;
+    seg7decimal({const0, SW}, clk100, SEG, AN, DP);
+    assign LED = SW;
     
 endmodule
