@@ -21,11 +21,9 @@
 
 // calculates the pixel difference between top and left pixel.
 module Sobel_Edge_Detection(
-    input [9:0] xAddr,
-    input [3:0] pixelR,
-    input [3:0] pixelG,
-    input [3:0] pixelB,
-    input       clk25,
+    input [9:0]  xAddr,
+    input [11:0] pixelIn,
+    input        clk25,
     // threshold values to display RGB colors at.  Will show a pixel if
     // value is above colorThresh and below cutThresh
     input [3:0] cutThresh,
@@ -34,10 +32,13 @@ module Sobel_Edge_Detection(
     input [3:0] bThresh,
     input       shiftBrightness,
     
-    output [3:0] outR,
-    output [3:0] outG,
-    output [3:0] outB
+    output [11:0] outPixel
     );
+    
+    wire [3:0] pixelR = pixelIn[11:8];
+    wire [3:0] pixelG = pixelIn[7:4];
+    wire [3:0] pixelB = pixelIn[3:0];
+    
     localparam weakThresh   = 1;
     localparam midThresh    = 4;
     localparam strongThresh = 7;
@@ -86,7 +87,7 @@ module Sobel_Edge_Detection(
                                             .gOut(dimmedG),
                                             .bOut(dimmedB));
 
-    assign outR = (redEdge)   ? 4'hF : dimmedR;
-    assign outG = (greenEdge) ? 4'hF : dimmedG;
-    assign outB = (blueEdge)  ? 4'hF : dimmedB;
+    assign outPixel[11:8] = (redEdge)   ? 4'hF : dimmedR;
+    assign outPixel[7:4]  = (greenEdge) ? 4'hF : dimmedG;
+    assign outPixel[3:0]  = (blueEdge)  ? 4'hF : dimmedB;
 endmodule
