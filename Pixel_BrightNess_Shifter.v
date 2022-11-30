@@ -21,15 +21,14 @@
 
 
 module Pixel_Brightness_Shifter(
-    input [3:0] pixelR,
-    input [3:0] pixelG,
-    input [3:0] pixelB,
+    input [11:0] pixelIn,
     input       shiftSig,
     
-    output [3:0] rOut,
-    output [3:0] gOut,
-    output [3:0] bOut
+    output [11:0] pixelOut
     );
+    wire [3:0] pixelR = pixelIn[11:8];
+    wire [3:0] pixelG = pixelIn[7:4];
+    wire [3:0] pixelB = pixelIn[3:0];
     
     wire [3:0] rShift [4:0];
     assign rShift[0] =          pixelR;
@@ -60,8 +59,5 @@ module Pixel_Brightness_Shifter(
             shiftCnt <= shiftCnt + 1;
     end
     
-    assign rOut = rShift[shiftCnt];
-    assign gOut = gShift[shiftCnt];
-    assign bOut = bShift[shiftCnt];
-    
+    assign pixelOut = {rShift[shiftCnt], gShift[shiftCnt], bShift[shiftCnt]};
 endmodule

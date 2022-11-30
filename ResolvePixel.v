@@ -21,7 +21,7 @@
 
 // takes in a 3x3 grid of pixels and returns the correct pixel.
 module ResolvePixel(
-    input [9:0] xAddr,
+    input [9:0]   xAddr,
     input [11:0]  inPixel_lu,
     input [11:0]  inPixel_lm,
     input [11:0]  inPixel_ld,
@@ -41,10 +41,9 @@ module ResolvePixel(
     input [3:0] numEdgesNeeded,
     input       shiftBrightness,
     input       edgeDetectEnable,
+    input       useSobel3x3,
     
-    output [3:0] outR,
-    output [3:0] outG,
-    output [3:0] outB
+    output [11:0] outPixel
     );
 
     wire [12*9-1:0] inPixels9x9;
@@ -94,22 +93,35 @@ module ResolvePixel(
     wire greenEdge = (numEdgesNeeded[3:0] == 4'h0) ? oe[13] : (greenEdges[3:0] > numEdgesNeeded[3:0]);
     wire blueEdge  = (numEdgesNeeded[3:0] == 4'h0) ? oe[12] : (blueEdges[3:0]  > numEdgesNeeded[3:0]);
 
-    wire [3:0] dimmedR;
-    wire [3:0] dimmedG;
-    wire [3:0] dimmedB;
-    Pixel_Brightness_Shifter brightShift (  .pixelR(inPixel_mm[11:8]),
-                                            .pixelG(inPixel_mm[7:4]),
-                                            .pixelB(inPixel_mm[3:0]),
+    wire [11:0] dimmedPixel;
+    Pixel_Brightness_Shifter brightShift (  .pixelIn(inPixel_mm),
                                             .shiftSig(shiftBrightness),
-                                            .rOut(dimmedR),
-                                            .gOut(dimmedG),
-                                            .bOut(dimmedB));
+                                            .pixelOut(dimmedPixel));
 
-    wire [3:0] edgeR = (redEdge)   ? 4'hF : dimmedR;
-    wire [3:0] edgeG = (greenEdge) ? 4'hF : dimmedG;
-    wire [3:0] edgeB = (blueEdge)  ? 4'hF : dimmedB;
+                                            
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    wire [11:0] sobEdge;
+    Sobel3x3 sobel3x3 ( .inPixel_lu(inPixel_lu),
+                        .inPixel_lm(inPixel_lm),
+                        .inPixel_ld(inPixel_ld),
+                        .inPixel_mu(inPixel_mu),
+                     // .inPixel_mm(inPixel_mm),
+                        .inPixel_md(inPixel_md),
+                        .inPixel_ru(inPixel_ru),
+                        .inPixel_rm(inPixel_rm),
+                        .inPixel_rd(inPixel_rd),
+                        .sobelEdge(sobEdge)
+    );
 
-    assign outR = (edgeDetectEnable) ? edgeR : inPixel_mm[11:8];
-    assign outG = (edgeDetectEnable) ? edgeG : inPixel_mm[7:4];
-    assign outB = (edgeDetectEnable) ? edgeB : inPixel_mm[3:0];
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    wire [3:0] edgeR = (redEdge)   ? 4'hF : dimmedPixel[11:8];
+    wire [3:0] edgeG = (greenEdge) ? 4'hF : dimmedPixel[7:4];
+    wire [3:0] edgeB = (blueEdge)  ? 4'hF : dimmedPixel[3:0];
+
+    assign outPixel = (edgeDetectEnable) ? ((useSobel3x3) ? sobEdge : 
+                                               {edgeR, edgeG, edgeB}) : inPixel_mm;
 endmodule

@@ -19,7 +19,6 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
 module TopModule(
     input clk100,
     // VGA OUT
@@ -82,8 +81,6 @@ module TopModule(
     wire [15:0] pixelValue;
     wire        pixelValid;
     
-    
-    
     Camera_Controller camCtrl ( .clk25(clk25),
                                 .OV7670_D(OV7670_D),
                                 .OV7670_HREF(OV7670_HREF),
@@ -105,20 +102,28 @@ module TopModule(
     wire [3:0] memB;
     wire [9:0] vgaX;
     wire [8:0] vgaY;
-    // the read latency is up to 2 clock cycles... I'm fixing this by using clk100 as the
-    // read clock, but it's possible I need delay the write by two cycles.
-    
-    // don't overwrite.
-    // both ports are clocked at 100 purposely.
+
+    // don't overwrite memory.  All extra processing must be done on separate, smaller pixel buffers.
+    //                          Then, for every clock cycle of latency introduced by processing and 
+    //                          using the extra buffers, read extra lines ahead to populate the buffers
+    //                          in time so the final output is the vgaX and vgaY
+    //                          
+    //                          Right now, all this extra processing is done in the frame buffer, as it is
+    //                          easier to keep track of how far ahead we need to read like this.
     wire writeEn = ((camX <= 640) && (camY <= 480)&& (~cameraOff));
     wire [11:0] pSq [8:0];
-    FrameBuffer frameBuf (  .writeClk(clk100), 
+    wire [11:0] edgeOut;
+    wire [11:0] vgaPixel;
+    FrameBuffer frameBuf (  .writeClk(OV7670_PCLK), 
                             .inX(camX),
                             .inY(camY),
                             .writeEn(pixelValid & writeEn),
                             .pixelIn(pixelValue),
+                            .edgePixelIn(edgeOut),
                             .blurPixel(blurImage),
-                            .readClk(clk100),
+                            .useMedian(SW[15:14]),
+                            .readClk(clk50),
+                            .vgaClk(clk25),
                             .outX(vgaX),
                             .outY(vgaY),
                             .outPixel_lu(pSq[0]),
@@ -129,12 +134,13 @@ module TopModule(
                             .outPixel_md(pSq[5]),
                             .outPixel_ru(pSq[6]),
                             .outPixel_rm(pSq[7]),
-                            .outPixel_rd(pSq[8])                            
+                            .outPixel_rd(pSq[8]),
+                            .outPixel_toVGA(vgaPixel)                            
     );
-    
-    wire [3:0] vgaR;
-    wire [3:0] vgaG;
-    wire [3:0] vgaB;
+
+    // this pixel is piped back into the frame buffer, bc we need to
+    // put it into an extra pixel buffer to run the median filter over
+    // it after the edges have been detected.
     ResolvePixel pixResolve (   .xAddr(vgaX),
                                 .inPixel_lu(pSq[0]),
                                 .inPixel_lm(pSq[1]),
@@ -148,21 +154,21 @@ module TopModule(
                                 .clk25(clk25),
                                 .clk100(clk100),
                                 // sobel.
-                                .cutThresh(SW[15:12]),
+                                .cutThresh(4'hF),       // this was determined as a good threshold value.
                                 .absThresh(SW[11:8]),
                                 .totThresh(SW[7:4]),
                                 .numEdgesNeeded(SW[3:0]),
                                 .shiftBrightness(edgeBrightnessShift),
                                 .edgeDetectEnable(edgeDetectEnable),
+                                .useSobel3x3(SW[13]),
                                 
-                                .outR(vgaR),
-                                .outG(vgaG),
-                                .outB(vgaB));
-                                
+                                .outPixel(edgeOut)
+    );
+
     VGA vga (   .pixel_clk(clk25),
-                .vgaInR(vgaR),
-                .vgaInG(vgaG),
-                .vgaInB(vgaB),
+                .vgaInR(vgaPixel[11:8]),
+                .vgaInG(vgaPixel[7:4]),
+                .vgaInB(vgaPixel[3:0]),
                 .outX(vgaX),
                 .outY(vgaY),
                 .VGA_R(vga_red),
@@ -171,7 +177,7 @@ module TopModule(
                 .VGA_HS(vga_hsync),
                 .VGA_VS(vga_vsync)
     );
-    
+
     wire [15:0] const0 = 16'h0000;
     seg7decimal({const0, SW}, clk100, SEG, AN, DP);
     assign LED = SW;

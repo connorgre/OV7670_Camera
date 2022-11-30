@@ -73,7 +73,7 @@ module BlurPixel(
                             .inPixel_rd(pSq[8]),
                             .blurredPixel(averageBlur)
     );
-    
+
     reg [1:0] blurType = 2'b00;
     always@(posedge blurPixel) begin
         if (blurType == 2'b10) 
@@ -81,6 +81,6 @@ module BlurPixel(
         else
             blurType <= blurType + 1;
     end
-    assign pixelOut = (blurType == 2'b10) ? averageBlur : ((blurType == 2'b01) ? gaussBlur : pSq[4]);
+    assign pixelOut = ((blurType == 2'b10) ? averageBlur : ((blurType == 2'b01) ? gaussBlur : pSq[4]));
 
 endmodule
