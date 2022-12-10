@@ -52,6 +52,7 @@ module TopModule(
     input               BTNL,
     input               BTNU,
     input               BTNR,
+    input               BTND,
     // switches
     input [15:0]        SW
     );
@@ -67,15 +68,20 @@ module TopModule(
     wire btnlPressed;
     wire btnuPressed;
     wire btnrPressed;
+    wire btndPressed;
     
-    wire cameraOff = btncPressed;
+    wire cameraOn = btncPressed;
     wire edgeDetectEnable = btnlPressed;
     wire edgeBrightnessShift = btnuPressed;
     wire blurImage = btnrPressed;
+    wire blurEnd   = btndPressed;
+    
     ButtonToggle btncTog (BTNC, clk25, btncPressed);
     ButtonToggle btnlTog (BTNL, clk25, btnlPressed);
     Debouncer    btnrDeb (BTNR, clk25, btnrPressed);
     Debouncer    btnuDeb (BTNU, clk25, btnuPressed);
+    Debouncer    btndDeb (BTND, clk25, btndPressed);
+    
     wire [9:0]  camX;
     wire [8:0]  camY;
     wire [15:0] pixelValue;
@@ -110,7 +116,7 @@ module TopModule(
     //                          
     //                          Right now, all this extra processing is done in the frame buffer, as it is
     //                          easier to keep track of how far ahead we need to read like this.
-    wire writeEn = ((camX <= 640) && (camY <= 480)&& (~cameraOff));
+    wire writeEn = ((camX <= 640) && (camY <= 480) && (cameraOn));
     wire [11:0] pSq [8:0];
     wire [11:0] edgeOut;
     wire [11:0] vgaPixel;
@@ -121,6 +127,7 @@ module TopModule(
                             .pixelIn(pixelValue),
                             .edgePixelIn(edgeOut),
                             .blurPixel(blurImage),
+                            .blurEnd(blurEnd),
                             .useMedian(SW[15:14]),
                             .readClk(clk50),
                             .vgaClk(clk25),
@@ -141,6 +148,20 @@ module TopModule(
     // this pixel is piped back into the frame buffer, bc we need to
     // put it into an extra pixel buffer to run the median filter over
     // it after the edges have been detected.
+    wire frameDone = (vgaY == 9'h000);
+    reg changeColor;
+    reg [3:0] frameCounter;
+    always@(posedge frameDone) begin
+        if (SW[10:8] > 3'h0) begin
+            if (frameCounter == {SW[10:8], 1'b1}) begin
+                changeColor <= ~changeColor;
+                frameCounter <= 4'h0;
+            end else begin
+                frameCounter <= frameCounter + 1;
+            end
+        end
+    end
+    
     ResolvePixel pixResolve (   .xAddr(vgaX),
                                 .inPixel_lu(pSq[0]),
                                 .inPixel_lm(pSq[1]),
@@ -155,13 +176,16 @@ module TopModule(
                                 .clk100(clk100),
                                 // sobel.
                                 .cutThresh(4'hF),       // this was determined as a good threshold value.
-                                .absThresh(SW[11:8]),
+                                .absThresh(SW[7:4]),
                                 .totThresh(SW[7:4]),
                                 .numEdgesNeeded(SW[3:0]),
+                                .sobelKernelThresh(SW[3:0]),
+                                .gradThresh(SW[6:0]),       // 4 is a good threshold.  This is for adding extra gradient colors.  goes from 8 to 24
+                                .gradMax(SW[7]),
+                                .frameDone(changeColor),
                                 .shiftBrightness(edgeBrightnessShift),
                                 .edgeDetectEnable(edgeDetectEnable),
-                                .useSobel3x3(SW[13]),
-                                
+                                .edgeType(SW[13:11]),
                                 .outPixel(edgeOut)
     );
 

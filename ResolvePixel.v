@@ -39,10 +39,13 @@ module ResolvePixel(
     input [3:0] absThresh,
     input [3:0] totThresh,
     input [3:0] numEdgesNeeded,
+    input [3:0] sobelKernelThresh,
+    input [6:0] gradThresh,
+    input       gradMax,
     input       shiftBrightness,
     input       edgeDetectEnable,
-    input       useSobel3x3,
-    
+    input [2:0] edgeType,
+    input       frameDone,
     output [11:0] outPixel
     );
 
@@ -98,7 +101,7 @@ module ResolvePixel(
                                             .shiftSig(shiftBrightness),
                                             .pixelOut(dimmedPixel));
 
-                                            
+
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
@@ -112,16 +115,79 @@ module ResolvePixel(
                         .inPixel_ru(inPixel_ru),
                         .inPixel_rm(inPixel_rm),
                         .inPixel_rd(inPixel_rd),
+                        .hOut(),
+                        .vOut(),
                         .sobelEdge(sobEdge)
     );
 
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    wire [11:0] gradEdge;
+    reg [4:0] colorShift = 5'h00;
+    always@(posedge frameDone) begin
+        colorShift <= (colorShift == 'd23) ? 5'h00 : colorShift + 1;
+    end
+    Sobel3x3GradDirection sobelGrad (   .inPixel_lu(inPixel_lu),
+                                        .inPixel_lm(inPixel_lm),
+                                        .inPixel_ld(inPixel_ld),
+                                        .inPixel_mu(inPixel_mu),
+                                     // .inPixel_mm(inPixel_mm),
+                                        .inPixel_md(inPixel_md),
+                                        .inPixel_ru(inPixel_ru),
+                                        .inPixel_rm(inPixel_rm),
+                                        .inPixel_rd(inPixel_rd),
+                                        .edgeThresh(gradThresh),
+                                        .gradMax(gradMax),
+                                        .colorShift(colorShift),
+                                        .sobelEdge(gradEdge)
+    );
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    wire [11:0] fuzzyEdge;
+    wire [11:0] morEdge;
+    FuzzyEdge fuzzyedge (   .inPixel_lu(inPixel_lu),
+                            .inPixel_lm(inPixel_lm),
+                            .inPixel_ld(inPixel_ld),
+                            .inPixel_mu(inPixel_mu),
+                            .inPixel_mm(inPixel_mm),
+                            .inPixel_md(inPixel_md),
+                            .inPixel_ru(inPixel_ru),
+                            .inPixel_rm(inPixel_rm),
+                            .inPixel_rd(inPixel_rd),
+                            .fuzzyEdge(fuzzyEdge),
+                            .morEdge(morEdge)
+    );
+    
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     wire [3:0] edgeR = (redEdge)   ? 4'hF : dimmedPixel[11:8];
     wire [3:0] edgeG = (greenEdge) ? 4'hF : dimmedPixel[7:4];
     wire [3:0] edgeB = (blueEdge)  ? 4'hF : dimmedPixel[3:0];
-
-    assign outPixel = (edgeDetectEnable) ? ((useSobel3x3) ? sobEdge : 
-                                               {edgeR, edgeG, edgeB}) : inPixel_mm;
+    
+  //wire useSimple      = (edgeType == anything else)  
+    wire useGrad        = (edgeType == 3'b011);
+    wire useSobel3x3    = (edgeType == 3'b010);
+    wire useMor         = (edgeType == 3'b101);
+    wire useFuzzy       = (edgeType == 3'b110); 
+    
+    wire [11:0] dimmedSob = ((sobEdge[11:8] <= sobelKernelThresh) && (sobEdge[7:4] <= sobelKernelThresh) && (sobEdge[3:0] <= sobelKernelThresh)) ? dimmedPixel : sobEdge;
+    wire [11:0] dimmedGrad = (gradEdge == 12'h000) ? dimmedPixel : gradEdge;
+    
+    // select the type of edge detection we're using.
+    reg [11:0] outEdge;
+    always@(*) begin
+        if (edgeDetectEnable) begin
+            case(edgeType)
+                3'b101: outEdge <= dimmedGrad;
+                3'b100: outEdge <= dimmedSob;
+                3'b111: outEdge <= fuzzyEdge;
+                3'b110: outEdge <= morEdge;
+                default: outEdge <= {edgeR, edgeG, edgeB};
+            endcase
+        end else
+            outEdge <= inPixel_mm;
+    end
+    assign outPixel = outEdge;
 endmodule

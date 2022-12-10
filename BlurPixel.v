@@ -48,8 +48,8 @@ module BlurPixel(
      );
      
      wire [11:0] gaussBlur;
+     wire [11:0] weightedAverageBlur;
      wire [11:0] averageBlur;
-     
      Gaussian3x3 gausFilter(    .inPixel_lu(pSq[0]),
                                 .inPixel_lm(pSq[1]),
                                 .inPixel_ld(pSq[2]),
@@ -71,16 +71,39 @@ module BlurPixel(
                             .inPixel_ru(pSq[6]),
                             .inPixel_rm(pSq[7]),
                             .inPixel_rd(pSq[8]),
-                            .blurredPixel(averageBlur)
+                            .blurredPixel(weightedAverageBlur)
+    );
+    
+    TrueAverage3x3 trueAverage (.inPixel_lu(pSq[0]),
+                                .inPixel_lm(pSq[1]),
+                                .inPixel_ld(pSq[2]),
+                                .inPixel_mu(pSq[3]),
+                                .inPixel_mm(pSq[4]),
+                                .inPixel_md(pSq[5]),
+                                .inPixel_ru(pSq[6]),
+                                .inPixel_rm(pSq[7]),
+                                .inPixel_rd(pSq[8]),
+                                .blurredPixel(averageBlur)
     );
 
     reg [1:0] blurType = 2'b00;
     always@(posedge blurPixel) begin
-        if (blurType == 2'b10) 
+        if (blurType == 2'b11) 
             blurType <= 2'b00;
         else
             blurType <= blurType + 1;
     end
-    assign pixelOut = ((blurType == 2'b10) ? averageBlur : ((blurType == 2'b01) ? gaussBlur : pSq[4]));
+    
+    reg [11:0] pixBlur;
+    always@(*) begin
+        case(blurType)
+            2'b00: pixBlur <= pSq[0];
+            2'b01: pixBlur <= averageBlur;
+            2'b10: pixBlur <= weightedAverageBlur;
+            2'b11: pixBlur <= gaussBlur;
+        endcase
+    
+    end
+    assign pixelOut = pixBlur;
 
 endmodule

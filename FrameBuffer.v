@@ -38,6 +38,7 @@ module FrameBuffer(
     input   [8:0]   outY,
     
     input           blurPixel,
+    input           blurEnd,
     input   [1:0]   useMedian,
     
     // go to the edge detection
@@ -55,7 +56,7 @@ module FrameBuffer(
     );
     // read ahead 4 lines for every extra pixel buffer we have, as they are 4 lines each.  I think it could be cut to 2 lines per buffer, but it
     // would complicate things.  Will only do if necessary
-    localparam extraBuffers = 4;
+    localparam extraBuffers = 5;
     localparam extraClocks = 10;
     localparam readAheadLines = extraBuffers * 4;
     localparam readAheadCols  = extraClocks;
@@ -205,5 +206,15 @@ module FrameBuffer(
                                 .medOut(medPixel)
     );
     
-    assign outPixel_toVGA = medPixel;
+    wire[11:0] blurPixel2;
+    // +1 buf
+    BlurPixel blurPix2 (.inX(outX),
+                        .inY(outY[1:0]),
+                        .writeClk(vgaClk),
+                        .pixelIn(medPixel),
+                        .blurPixel(blurEnd),
+                        .pixelOut(blurPixel2)
+    );
+    
+    assign outPixel_toVGA = blurPixel2;
 endmodule

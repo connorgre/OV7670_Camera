@@ -24,7 +24,7 @@
 //  1/16 *  | 1, 8, 1 |
 //          | 1, 1, 1 |
 module Average3x3(
-input [11:0]  inPixel_lu,
+    input [11:0]  inPixel_lu,
     input [11:0]  inPixel_lm,
     input [11:0]  inPixel_ld,
     input [11:0]  inPixel_mu,

@@ -31,6 +31,8 @@ module Sobel3x3(
     input [11:0]  inPixel_rm,
     input [11:0]  inPixel_rd,
 
+    output [23:0] hOut,
+    output [23:0] vOut,
     output [11:0] sobelEdge
     );
 
@@ -43,8 +45,10 @@ module Sobel3x3(
     wire [20:0] colSum;
     wire [20:0] rowSum;
     
+    
+    
     wire [2:0] lGt, uGt;
-    wire [2:0] sGt;
+    wire [2:0] hGt, vGt;
     genvar i;
     generate
         for(i=0; i < 3; i=i+1) begin    // * 1                        *2                                 *1
@@ -54,17 +58,21 @@ module Sobel3x3(
             // horizontal edges
             assign uRow[6*(i+1)-1:6*i] = inPixel_lu[4*(i+1)-1:4*i] + {inPixel_mu[4*(i+1)-1:4*i], 1'b0} + inPixel_ru[4*(i+1)-1:4*i];
             assign dRow[6*(i+1)-1:6*i] = inPixel_ld[4*(i+1)-1:4*i] + {inPixel_md[4*(i+1)-1:4*i], 1'b0} + inPixel_rd[4*(i+1)-1:4*i];
-            
+
             assign lGt[i] = (lCol[6*(i+1)-1:6*i] > rCol[6*(i+1)-1:6*i]);
             assign uGt[i] = (uRow[6*(i+1)-1:6*i] > dRow[6*(i+1)-1:6*i]);
-            
+
             assign colSum[7*(i+1)-1:7*i] = (lGt[i]) ? (lCol[6*(i+1)-1:6*i] - rCol[6*(i+1)-1:6*i]) : (rCol[6*(i+1)-1:6*i] - lCol[6*(i+1)-1:6*i]);
             assign rowSum[7*(i+1)-1:7*i] = (uGt[i]) ? (uRow[6*(i+1)-1:6*i] - dRow[6*(i+1)-1:6*i]) : (dRow[6*(i+1)-1:6*i] - uRow[6*(i+1)-1:6*i]);
-            
-            assign sGt[i] = (colSum[7*(i+1)-1:7*i] > 7'h0F) || (rowSum[7*(i+1)-1:7*i] > 7'h0F);
-            
-            assign sobelSum[5*(i+1)-1:5*i] = (sGt[i]) ? 5'h1F : colSum[4*(i+1)-1:4*i] + rowSum[4*(i+1)-1:4*i];
-            assign sobelEdge[4*(i+1)-1:4*i] = /*(sobelSum[5*(i+1)-1]) ? 4'hF :*/ sobelSum[5*(i+1)-2:5*i];
+
+            assign hOut[8*(i+1)-1:8*i] = {lGt[i], colSum[7*(i+1)-1:7*i]};
+            assign vOut[8*(i+1)-1:8*i] = {uGt[i], rowSum[7*(i+1)-1:7*i]};
+
+            assign hGt[i] = (colSum[7*(i+1)-1:7*i] > 7'h0F);
+            assign vGt[i] = (rowSum[7*(i+1)-1:7*i] > 7'h0F);
+
+            assign sobelSum[5*(i+1)-1:5*i] = (hGt[i] | vGt[i]) ? 5'h1F : colSum[4*(i+1)-1:4*i] + rowSum[4*(i+1)-1:4*i];
+            assign sobelEdge[4*(i+1)-1:4*i] = sobelSum[5*(i+1)-2:5*i];
         end
     endgenerate
 endmodule
